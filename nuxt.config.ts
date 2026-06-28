@@ -1,0 +1,14 @@
+// https://nuxt.com/docs/api/configuration/nuxt-config
+export default defineNuxtConfig({
+  modules: ['@nuxt/ui'],
+
+  future: {
+    compatibilityVersion: 4,
+  },
+
+  compatibilityDate: '2025-06-28',
+
+  runtimeConfig: {
+    deepseekApiKey: '',
+  },
+})
