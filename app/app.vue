@@ -1,5 +1,7 @@
 <template>
-  <UContainer>
-    <NuxtPage />
-  </UContainer>
+  <UApp>
+    <UContainer>
+      <NuxtPage />
+    </UContainer>
+  </UApp>
 </template>
