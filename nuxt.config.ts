@@ -8,6 +8,10 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2025-06-28',
 
+  devServer: {
+    port: 8460,
+  },
+
   runtimeConfig: {
     deepseekApiKey: '',
   },
