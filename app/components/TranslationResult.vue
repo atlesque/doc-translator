@@ -8,12 +8,14 @@ const props = defineProps<{
   targetLanguage: string
   total?: number
   retryingIndex?: number | null
+  hasCachedChunks?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'retry', index: number): void
   (e: 'restart', index: number): void
   (e: 'retryAll'): void
+  (e: 'clearCache'): void
 }>()
 
 const isRetrying = (index: number) => props.retryingIndex === index
@@ -77,6 +79,16 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
       </p>
       <div class="flex gap-2">
         <UButton
+          v-if="hasCachedChunks"
+          icon="i-heroicons-trash"
+          size="sm"
+          color="warning"
+          variant="outline"
+          @click="emit('clearCache')"
+        >
+          Clear cache &amp; retry
+        </UButton>
+        <UButton
           v-if="failedIndices.length > 0"
           icon="i-heroicons-arrow-path"
           size="sm"
@@ -122,9 +134,18 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
       >
         <template #header>
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
-              Paragraph {{ chunk.index + 1 }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Paragraph {{ chunk.index + 1 }}
+              </span>
+              <UBadge
+                v-if="chunk.fromCache"
+                label="cached"
+                color="info"
+                variant="soft"
+                size="xs"
+              />
+            </div>
             <UDropdownMenu
               :items="chunkMenuItems(chunk.index)"
             >
