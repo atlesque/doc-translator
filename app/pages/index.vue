@@ -17,6 +17,12 @@ const canTranslate = computed(
 
 const buttonLabel = 'Translate'
 
+const translatingLabel = computed(() =>
+  targetLanguage.value === 'Auto-detect'
+    ? 'Translating...'
+    : `Translating to ${targetLanguage.value}…`,
+)
+
 async function handleTranslate() {
   if (!file.value || !language.value) return
   await translate(file.value, language.value)
@@ -59,7 +65,7 @@ function handleReset() {
         name="i-heroicons-arrow-path"
         class="text-4xl text-primary-500 animate-spin mx-auto"
       />
-      <p class="text-lg font-medium">Translating to {{ targetLanguage }}&hellip;</p>
+      <p class="text-lg font-medium">{{ translatingLabel }}</p>
       <p class="text-sm text-gray-500 dark:text-gray-400">
         This may take a moment
       </p>
