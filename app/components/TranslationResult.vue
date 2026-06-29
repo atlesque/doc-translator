@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TranslatedChunk } from '~/types/translation'
+import type { TranslatedChunk } from '../../types/translation'
 
 const props = defineProps<{
   chunks: TranslatedChunk[]
