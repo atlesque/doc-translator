@@ -7,6 +7,7 @@ const {
   targetLanguage,
   detectedLanguage,
   translate,
+  cancel,
   reset,
 } = useTranslation()
 
@@ -43,6 +44,10 @@ const progressPercent = computed(() =>
 async function handleTranslate() {
   if (!file.value || !language.value) return
   await translate(file.value, language.value)
+}
+
+function handleCancel() {
+  cancel()
 }
 
 function handleReset() {
@@ -100,6 +105,18 @@ function handleReset() {
           size="lg"
           color="primary"
         />
+      </div>
+
+      <!-- Cancel button -->
+      <div class="text-center">
+        <UButton
+          variant="outline"
+          color="error"
+          size="md"
+          @click="handleCancel"
+        >
+          Cancel translation
+        </UButton>
       </div>
 
       <!-- Progressive chunk display as they arrive -->

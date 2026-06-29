@@ -30,7 +30,19 @@ export function useTranslation() {
     }
   }
 
+  let abortController: AbortController | null = null
+  let cancelled = false
+
+  function cancel() {
+    cancelled = true
+    abortController?.abort()
+    if (status.value === 'translating') {
+      status.value = 'partial'
+    }
+  }
+
   async function translate(file: File, lang: string) {
+    cancelled = false
     status.value = 'translating'
     targetLanguage.value = lang
     error.value = null
@@ -38,10 +50,10 @@ export function useTranslation() {
     detectedLanguage.value = null
     progress.value = { current: 0, total: 0 }
 
-    let aborted = false
+    abortController = new AbortController()
 
     function processEvent(event: SSEEvent) {
-      if (aborted) return
+      if (cancelled) return
       switch (event.type) {
         case 'total':
           progress.value = { current: 0, total: event.total! }
@@ -54,6 +66,7 @@ export function useTranslation() {
           progress.value = { current: chunks.value.length, total: progress.value.total }
           break
         case 'done': {
+          if (cancelled) break
           const failedCount = chunks.value.filter(c => !c.success).length
           if (failedCount === chunks.value.length) {
             status.value = 'error'
@@ -76,6 +89,7 @@ export function useTranslation() {
       const response = await fetch('/api/translate', {
         method: 'POST',
         body: formData,
+        signal: abortController.signal,
       })
 
       if (!response.ok) {
@@ -90,6 +104,10 @@ export function useTranslation() {
       let buffer = ''
 
       while (true) {
+        if (cancelled) {
+          reader.cancel()
+          break
+        }
         const { done, value } = await reader.read()
         if (done) break
 
@@ -112,22 +130,30 @@ export function useTranslation() {
       }
 
       // Flush remaining buffer
-      if (buffer.startsWith('data: ')) {
+      if (!cancelled && buffer.startsWith('data: ')) {
         try {
           const event = JSON.parse(buffer.slice(6)) as SSEEvent
           processEvent(event)
         } catch { /* skip */ }
       }
     } catch (err: any) {
-      aborted = true
+      if (err?.name === 'AbortError') {
+        // cancelled by user — already handled in cancel()
+        return
+      }
+      cancelled = true
       if (status.value === 'translating') {
         status.value = 'error'
         error.value = err?.message || 'Translation request failed'
       }
+    } finally {
+      abortController = null
     }
   }
 
   function reset() {
+    cancelled = true
+    abortController?.abort()
     status.value = 'idle'
     chunks.value = []
     progress.value = { current: 0, total: 0 }
@@ -146,6 +172,7 @@ export function useTranslation() {
     apiKeyConfigured: readonly(apiKeyConfigured),
     configChecked: readonly(configChecked),
     translate,
+    cancel,
     reset,
     checkConfig,
   }

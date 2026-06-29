@@ -64,12 +64,19 @@ export default defineEventHandler(async (event) => {
     async start(controller) {
       const encoder = new TextEncoder()
       let hasFailure = false
+      let aborted = false
+
+      // Listen for client disconnect
+      event.node.req.on('close', () => {
+        aborted = true
+        try { controller.close() } catch { /* already closed */ }
+      })
 
       // Send initial total so frontend knows how many chunks to expect
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'total', total })}\n\n`))
+      if (!aborted) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'total', total })}\n\n`))
 
       // If auto-detect succeeded, tell the frontend what language was detected
-      if (sourceLanguage) {
+      if (!aborted && sourceLanguage) {
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({ type: 'detectedLanguage', detectedLanguage: sourceLanguage })}\n\n`,
@@ -77,7 +84,7 @@ export default defineEventHandler(async (event) => {
         )
       }
 
-      for (let i = 0; i < total; i++) {
+      for (let i = 0; i < total && !aborted; i++) {
         const original = chunkTexts[i]!
         let chunk: TranslatedChunk
 
@@ -102,15 +109,19 @@ export default defineEventHandler(async (event) => {
           }
         }
 
-        // Stream this chunk immediately
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', chunk })}\n\n`))
+        // Stream this chunk immediately (if client still connected)
+        if (!aborted) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', chunk })}\n\n`))
+        }
       }
 
-      // Send completion event
-      controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ type: 'done', hasFailure })}\n\n`),
-      )
-      controller.close()
+      // Send completion event only if not aborted
+      if (!aborted) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: 'done', hasFailure })}\n\n`),
+        )
+        controller.close()
+      }
     },
   })
 
