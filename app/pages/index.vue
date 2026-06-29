@@ -7,11 +7,13 @@ const {
   error,
   targetLanguage,
   detectedLanguage,
+  hasCachedChunks,
   translate,
   cancel,
   retryChunk,
   retryAll,
   restartFromChunk,
+  clearCacheAndRetry,
   reset,
 } = useTranslation()
 
@@ -67,6 +69,10 @@ function handleRestart(index: number) {
 
 function handleRetryAll() {
   retryAll()
+}
+
+function handleClearCache() {
+  clearCacheAndRetry()
 }
 
 function handleReset() {
@@ -146,9 +152,11 @@ function handleReset() {
           :target-language="displayLanguage"
           :total="progress.total"
           :retrying-index="retryingIndex"
+          :has-cached-chunks="hasCachedChunks"
           @retry="handleRetry"
           @restart="handleRestart"
           @retry-all="handleRetryAll"
+          @clear-cache="handleClearCache"
         />
       </div>
 
@@ -172,9 +180,11 @@ function handleReset() {
         :target-language="displayLanguage"
         :total="progress.total"
         :retrying-index="retryingIndex"
+        :has-cached-chunks="hasCachedChunks"
         @retry="handleRetry"
         @restart="handleRestart"
         @retry-all="handleRetryAll"
+        @clear-cache="handleClearCache"
       />
     </div>
 
@@ -186,9 +196,11 @@ function handleReset() {
         :target-language="displayLanguage"
         :total="progress.total"
         :retrying-index="retryingIndex"
+        :has-cached-chunks="hasCachedChunks"
         @retry="handleRetry"
         @restart="handleRestart"
         @retry-all="handleRetryAll"
+        @clear-cache="handleClearCache"
       />
       <div class="text-center">
         <UButton
@@ -213,9 +225,11 @@ function handleReset() {
         :target-language="displayLanguage"
         :total="progress.total"
         :retrying-index="retryingIndex"
+        :has-cached-chunks="hasCachedChunks"
         @retry="handleRetry"
         @restart="handleRestart"
         @retry-all="handleRetryAll"
+        @clear-cache="handleClearCache"
       />
       <div class="text-center">
         <UButton
