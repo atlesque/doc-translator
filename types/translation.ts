@@ -4,6 +4,16 @@ export interface TranslatedChunk {
   translated: string | null
   success: boolean
   error?: string
+  fromCache?: boolean
+}
+
+export interface CachedTranslationEntry {
+  contentHash: string
+  targetLanguage: string
+  sourceLanguage?: string
+  chunks: TranslatedChunk[]
+  totalChunks: number
+  timestamp: number
 }
 
 export interface TranslateResponse {
