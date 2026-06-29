@@ -9,16 +9,13 @@ const {
 } = useTranslation()
 
 const file = ref<File | null>(null)
-const language = ref('')
+const language = ref('Auto-detect')
 
 const canTranslate = computed(
   () => file.value !== null && language.value.trim().length > 0,
 )
 
-const buttonLabel = computed(() => {
-  if (!language.value) return 'Select a language'
-  return `Translate to ${language.value}`
-})
+const buttonLabel = 'Translate'
 
 async function handleTranslate() {
   if (!file.value || !language.value) return

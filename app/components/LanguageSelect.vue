@@ -7,6 +7,8 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
 }>()
 
+const AUTO_DETECT = 'Auto-detect'
+
 const COMMON_LANGUAGES = [
   'English',
   'Spanish',
@@ -25,7 +27,10 @@ const COMMON_LANGUAGES = [
   'Vietnamese',
 ] as const
 
+const BUILT_IN = [AUTO_DETECT, ...COMMON_LANGUAGES] as const
+
 const selectOptions = [
+  { label: AUTO_DETECT, value: AUTO_DETECT },
   ...COMMON_LANGUAGES.map(lang => ({ label: lang, value: lang })),
   { label: 'Other…', value: '__other__' },
 ]
@@ -33,7 +38,7 @@ const selectOptions = [
 const selectedLanguage = computed({
   get: () => {
     if (!props.modelValue) return ''
-    if ((COMMON_LANGUAGES as readonly string[]).includes(props.modelValue)) return props.modelValue
+    if ((BUILT_IN as readonly string[]).includes(props.modelValue)) return props.modelValue
     return '__other__'
   },
   set: (val: string) => {
@@ -47,7 +52,7 @@ const selectedLanguage = computed({
 
 const showCustomInput = computed(
   () =>
-    !(COMMON_LANGUAGES as readonly string[]).includes(props.modelValue) &&
+    !(BUILT_IN as readonly string[]).includes(props.modelValue) &&
     props.modelValue !== '' &&
     selectedLanguage.value !== '__other__',
 )
