@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from 'vue';
+
 const props = defineProps<{
   modelValue: File | null
 }>()
@@ -67,7 +69,7 @@ function clearFile() {
         Drag & drop a .txt file here
       </p>
       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        or click to browse &mdash; or paste content
+        or click to browse
       </p>
       <input
         type="file"
