@@ -57,7 +57,7 @@ const showCustomInput = computed(
   <div class="space-y-3">
     <USelect
       v-model="selectedLanguage"
-      :options="selectOptions"
+      :items="selectOptions"
       placeholder="Select language"
       label="Target Language"
     />
