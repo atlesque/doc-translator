@@ -1,5 +1,6 @@
-import { readonly, ref } from 'vue'
+import { readonly, ref, computed } from 'vue'
 import type { TranslatedChunk, TranslationStatus } from '../../types/translation'
+import { useTranslationCache } from './useTranslationCache'
 
 interface SSEEvent {
   type: 'total' | 'detectedLanguage' | 'chunk' | 'done'
@@ -24,6 +25,10 @@ export function useTranslation() {
   let originalFile: File | null = null
   let effectiveTargetLanguage = ''
   let effectiveSourceLanguage: string | undefined
+
+  const cache = useTranslationCache()
+  const cacheKey = ref<string | null>(null)
+  const hasCachedChunks = computed(() => chunks.value.some(c => c.fromCache))
 
   async function checkConfig() {
     try {
@@ -77,6 +82,10 @@ export function useTranslation() {
           translated: result.translated,
           success: true,
           error: undefined,
+        }
+        // Update cache if we have a cache key
+        if (cacheKey.value) {
+          cache.updateCachedChunk(cacheKey.value, index, chunks.value[index])
         }
       } else {
         chunks.value[index] = {
@@ -231,6 +240,48 @@ export function useTranslation() {
     originalFile = file
     effectiveTargetLanguage = lang
     effectiveSourceLanguage = undefined
+
+    // Check localStorage cache before starting translation
+    const contentHash = await cache.computeContentHash(file)
+    if (contentHash) {
+      const resolvedTargetLang = lang === 'Auto-detect' ? 'English' : lang
+      const key = cache.buildCacheKey(contentHash, resolvedTargetLang)
+      const cached = cache.loadCacheEntry(key)
+      if (cached && cached.chunks.length > 0) {
+        const allCached = cached.chunks.length === cached.totalChunks
+        if (allCached) {
+          // Full cache hit — restore everything immediately
+          chunks.value = cached.chunks.map(c => ({ ...c, fromCache: true }))
+          progress.value = { current: cached.totalChunks, total: cached.totalChunks }
+          detectedLanguage.value = cached.sourceLanguage ?? null
+          effectiveSourceLanguage = cached.sourceLanguage ?? undefined
+          targetLanguage.value = cached.targetLanguage
+          cacheKey.value = key
+          const failedCount = cached.chunks.filter(c => !c.success).length
+          if (failedCount === cached.totalChunks) {
+            status.value = 'error'
+            error.value = 'All chunks failed to translate.'
+          } else if (failedCount > 0) {
+            status.value = 'partial'
+          } else {
+            status.value = 'done'
+          }
+          return
+        } else {
+          // Partial cache hit — replay cached chunks, translate the rest
+          chunks.value = cached.chunks.map(c => ({ ...c, fromCache: true }))
+          progress.value = { current: cached.chunks.length, total: cached.totalChunks }
+          detectedLanguage.value = cached.sourceLanguage ?? null
+          effectiveSourceLanguage = cached.sourceLanguage ?? undefined
+          targetLanguage.value = cached.targetLanguage
+          cacheKey.value = key
+        }
+      } else {
+        // Cache miss or empty — start fresh, record key for saving later
+        cacheKey.value = key
+      }
+    }
+
     status.value = 'translating'
     targetLanguage.value = lang
     error.value = null
@@ -239,6 +290,24 @@ export function useTranslation() {
     progress.value = { current: 0, total: 0 }
 
     abortController = new AbortController()
+
+    /**
+     * Persists the current chunks array to localStorage cache.
+     * Uses the cached contentHash and resolved target language for the key.
+     * No-op if no cache key has been established (hashing failed or was skipped).
+     */
+    function persistToCache() {
+      const key = cacheKey.value
+      if (!key) return
+      cache.saveCacheEntry(key, {
+        contentHash: contentHash ?? '',
+        targetLanguage: lang === 'Auto-detect' ? 'English' : lang,
+        sourceLanguage: effectiveSourceLanguage,
+        chunks: chunks.value,
+        totalChunks: progress.value.total,
+        timestamp: Date.now(),
+      })
+    }
 
     function processEvent(event: SSEEvent) {
       if (cancelled) return
@@ -253,9 +322,13 @@ export function useTranslation() {
         case 'chunk':
           chunks.value = [...chunks.value, event.chunk!]
           progress.value = { current: chunks.value.length, total: progress.value.total }
+          // Save to cache incrementally as each chunk arrives
+          persistToCache()
           break
         case 'done': {
           if (cancelled) break
+          // Save final state to cache
+          persistToCache()
           const failedCount = chunks.value.filter(c => !c.success).length
           if (failedCount === chunks.value.length) {
             status.value = 'error'
@@ -274,6 +347,11 @@ export function useTranslation() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('targetLanguage', lang)
+
+      // If partial cache hit, pass startIndex so server skips cached chunks
+      if (chunks.value.length > 0) {
+        formData.append('startIndex', String(chunks.value.length))
+      }
 
       const response = await fetch('/api/translate', {
         method: 'POST',
@@ -340,6 +418,28 @@ export function useTranslation() {
     }
   }
 
+  /**
+   * Clears the cached translation for the current file and re-translates from scratch.
+   * Removes the localStorage entry, strips fromCache flags, and restarts translation.
+   */
+  async function clearCacheAndRetry() {
+    if (cacheKey.value) {
+      cache.deleteCacheEntry(cacheKey.value)
+    }
+    cacheKey.value = null
+
+    // Strip fromCache flags from all chunks
+    chunks.value = chunks.value.map((c) => {
+      const { fromCache, ...rest } = c
+      return rest
+    })
+
+    // Re-initiate translation from scratch
+    if (originalFile) {
+      await translate(originalFile, effectiveTargetLanguage)
+    }
+  }
+
   function reset() {
     cancelled = true
     abortController?.abort()
@@ -347,6 +447,7 @@ export function useTranslation() {
     effectiveTargetLanguage = ''
     effectiveSourceLanguage = undefined
     retryingIndex.value = null
+    cacheKey.value = null
     status.value = 'idle'
     chunks.value = []
     progress.value = { current: 0, total: 0 }
@@ -363,6 +464,7 @@ export function useTranslation() {
     error: readonly(error),
     targetLanguage: readonly(targetLanguage),
     detectedLanguage: readonly(detectedLanguage),
+    hasCachedChunks,
     apiKeyConfigured: readonly(apiKeyConfigured),
     configChecked: readonly(configChecked),
     translate,
@@ -370,6 +472,7 @@ export function useTranslation() {
     retryChunk,
     retryAll,
     restartFromChunk,
+    clearCacheAndRetry,
     reset,
     checkConfig,
   }
