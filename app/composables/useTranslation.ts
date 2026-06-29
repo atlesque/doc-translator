@@ -2,8 +2,9 @@ import { readonly, ref } from 'vue'
 import type { TranslatedChunk, TranslationStatus } from '../../types/translation'
 
 interface SSEEvent {
-  type: 'total' | 'chunk' | 'done'
+  type: 'total' | 'detectedLanguage' | 'chunk' | 'done'
   total?: number
+  detectedLanguage?: string
   chunk?: TranslatedChunk
   hasFailure?: boolean
 }
@@ -14,6 +15,7 @@ export function useTranslation() {
   const progress = ref({ current: 0, total: 0 })
   const error = ref<string | null>(null)
   const targetLanguage = ref('')
+  const detectedLanguage = ref<string | null>(null)
   const apiKeyConfigured = ref(true)
   const configChecked = ref(false)
 
@@ -33,6 +35,7 @@ export function useTranslation() {
     targetLanguage.value = lang
     error.value = null
     chunks.value = []
+    detectedLanguage.value = null
     progress.value = { current: 0, total: 0 }
 
     let aborted = false
@@ -42,6 +45,9 @@ export function useTranslation() {
       switch (event.type) {
         case 'total':
           progress.value = { current: 0, total: event.total! }
+          break
+        case 'detectedLanguage':
+          detectedLanguage.value = event.detectedLanguage ?? null
           break
         case 'chunk':
           chunks.value = [...chunks.value, event.chunk!]
@@ -127,6 +133,7 @@ export function useTranslation() {
     progress.value = { current: 0, total: 0 }
     error.value = null
     targetLanguage.value = ''
+    detectedLanguage.value = null
   }
 
   return {
@@ -135,6 +142,7 @@ export function useTranslation() {
     progress: readonly(progress),
     error: readonly(error),
     targetLanguage: readonly(targetLanguage),
+    detectedLanguage: readonly(detectedLanguage),
     apiKeyConfigured: readonly(apiKeyConfigured),
     configChecked: readonly(configChecked),
     translate,

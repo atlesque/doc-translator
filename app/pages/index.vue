@@ -5,6 +5,7 @@ const {
   progress,
   error,
   targetLanguage,
+  detectedLanguage,
   translate,
   reset,
 } = useTranslation()
@@ -18,10 +19,19 @@ const canTranslate = computed(
 
 const buttonLabel = 'Translate'
 
-const translatingLabel = computed(() =>
-  targetLanguage.value === 'Auto-detect'
-    ? 'Translating...'
-    : `Translating to ${targetLanguage.value}…`,
+const translatingLabel = computed(() => {
+  if (detectedLanguage.value) {
+    return `Translating from ${detectedLanguage.value} to English…`
+  }
+  return targetLanguage.value === 'Auto-detect'
+    ? 'Detecting language…'
+    : `Translating to ${targetLanguage.value}…`
+})
+
+const displayLanguage = computed(() =>
+  detectedLanguage.value
+    ? `${detectedLanguage.value} → English`
+    : targetLanguage.value,
 )
 
 const progressPercent = computed(() =>
@@ -97,7 +107,7 @@ function handleReset() {
         <TranslationResult
           :chunks="chunks"
           status="partial"
-          :target-language="targetLanguage"
+          :target-language="displayLanguage"
         />
       </div>
 
@@ -111,7 +121,7 @@ function handleReset() {
       <TranslationResult
         :chunks="chunks"
         :status="status"
-        :target-language="targetLanguage"
+        :target-language="displayLanguage"
       />
       <div class="text-center">
         <UButton
@@ -133,7 +143,7 @@ function handleReset() {
       <TranslationResult
         :chunks="chunks"
         status="partial"
-        :target-language="targetLanguage"
+        :target-language="displayLanguage"
       />
       <div class="text-center">
         <UButton

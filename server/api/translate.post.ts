@@ -1,4 +1,5 @@
 import type { TranslatedChunk } from '../../types/translation'
+import { detectLanguage, translateChunk } from '../utils/deepseek'
 
 export default defineEventHandler(async (event) => {
   const formData = await readMultipartFormData(event)
@@ -27,8 +28,22 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No target language provided' })
   }
 
-  // Narrowed after the guard above, but re-bind for closure safety
-  const lang: string = targetLanguage
+  const isAutoDetect = targetLanguage === 'Auto-detect'
+
+  // When auto-detecting, first detect the source language from the first 1000 chars
+  let sourceLanguage: string | undefined
+  let effectiveTarget: string = targetLanguage
+
+  if (isAutoDetect) {
+    effectiveTarget = 'English'
+    try {
+      sourceLanguage = await detectLanguage(fileContent)
+      console.log(`Detected source language: ${sourceLanguage}`)
+    } catch (err) {
+      console.error('Language detection failed, falling back to generic prompt:', err)
+      // Fall back to generic auto-detect (sourceLanguage stays undefined)
+    }
+  }
 
   // Chunk the text
   const chunkTexts = splitIntoChunks(fileContent)
@@ -53,17 +68,26 @@ export default defineEventHandler(async (event) => {
       // Send initial total so frontend knows how many chunks to expect
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'total', total })}\n\n`))
 
+      // If auto-detect succeeded, tell the frontend what language was detected
+      if (sourceLanguage) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: 'detectedLanguage', detectedLanguage: sourceLanguage })}\n\n`,
+          ),
+        )
+      }
+
       for (let i = 0; i < total; i++) {
         const original = chunkTexts[i]!
         let chunk: TranslatedChunk
 
         try {
-          const translated = await translateChunk(original, lang)
+          const translated = await translateChunk(original, effectiveTarget, sourceLanguage)
           chunk = { index: i, original, translated, success: true }
         } catch (firstError) {
           console.warn(`Chunk ${i} first attempt failed, retrying...`, firstError)
           try {
-            const translated = await translateChunk(original, lang)
+            const translated = await translateChunk(original, effectiveTarget, sourceLanguage)
             chunk = { index: i, original, translated, success: true }
           } catch (secondError: any) {
             console.error(`Chunk ${i} failed after retry:`, secondError)
