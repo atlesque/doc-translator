@@ -8,15 +8,18 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No form data provided' })
   }
 
-  // Extract file and targetLanguage from form fields
+  // Extract file, targetLanguage, and optional startIndex from form fields
   let fileContent = ''
   let targetLanguage = ''
+  let startIndex = 0
 
   for (const field of formData) {
     if (field.name === 'file' && field.filename) {
       fileContent = field.data.toString('utf-8')
     } else if (field.name === 'targetLanguage') {
       targetLanguage = field.data.toString('utf-8')
+    } else if (field.name === 'startIndex') {
+      startIndex = parseInt(field.data.toString('utf-8'), 10) || 0
     }
   }
 
@@ -53,6 +56,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const total = chunkTexts.length
+  const effectiveTotal = total - startIndex
 
   // Set up SSE streaming response
   setHeader(event, 'Content-Type', 'text/event-stream')
@@ -73,7 +77,8 @@ export default defineEventHandler(async (event) => {
       })
 
       // Send initial total so frontend knows how many chunks to expect
-      if (!aborted) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'total', total })}\n\n`))
+      // When restarting from startIndex, only report the remaining count
+      if (!aborted) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'total', total: effectiveTotal })}\n\n`))
 
       // If auto-detect succeeded, tell the frontend what language was detected
       if (!aborted && sourceLanguage) {
@@ -84,7 +89,7 @@ export default defineEventHandler(async (event) => {
         )
       }
 
-      for (let i = 0; i < total && !aborted; i++) {
+      for (let i = startIndex; i < total && !aborted; i++) {
         const original = chunkTexts[i]!
         let chunk: TranslatedChunk
 

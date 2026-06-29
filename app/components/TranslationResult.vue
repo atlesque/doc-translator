@@ -1,15 +1,54 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui';
 import type { TranslatedChunk } from '../../types/translation';
 
 const props = defineProps<{
   chunks: readonly TranslatedChunk[]
   status: 'done' | 'partial'
   targetLanguage: string
+  total?: number
 }>()
 
 const emit = defineEmits<{
   (e: 'retry', index: number): void
+  (e: 'restart', index: number): void
+  (e: 'retryAll'): void
 }>()
+
+const failedIndices = computed(() =>
+  props.chunks
+    .map((c, i) => (c.success ? -1 : i))
+    .filter(i => i !== -1),
+)
+
+function chunkMenuItems(index: number): DropdownMenuItem[][] {
+  return [
+    [
+      {
+        label: 'Retry this paragraph',
+        icon: 'i-heroicons-arrow-path',
+        // @ts-ignore — custom payload for @select handler
+        _action: 'retry' as const,
+        _index: index,
+      },
+      {
+        label: 'Restart from here',
+        icon: 'i-heroicons-play',
+        // @ts-ignore
+        _action: 'restart' as const,
+        _index: index,
+      },
+    ],
+  ]
+}
+
+function onChunkMenuSelect(item: DropdownMenuItem & { _action?: string; _index?: number }) {
+  if (item._action === 'retry' && item._index !== undefined) {
+    emit('retry', item._index)
+  } else if (item._action === 'restart' && item._index !== undefined) {
+    emit('restart', item._index)
+  }
+}
 
 function copyAll() {
   const text = props.chunks
@@ -39,9 +78,19 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
     <!-- Top action bar -->
     <div class="flex items-center justify-between">
       <p class="text-sm text-gray-500 dark:text-gray-400">
-        {{ successCount }} / {{ chunks.length }} paragraphs translated to {{ targetLanguage }}
+        {{ successCount }} / {{ total ?? chunks.length }} paragraphs translated to {{ targetLanguage }}
       </p>
       <div class="flex gap-2">
+        <UButton
+          v-if="failedIndices.length > 0"
+          icon="i-heroicons-arrow-path"
+          size="sm"
+          color="warning"
+          variant="outline"
+          @click="emit('retryAll')"
+        >
+          Retry all failed
+        </UButton>
         <UButton
           icon="i-heroicons-clipboard"
           size="sm"
@@ -77,22 +126,24 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
             <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
               Paragraph {{ chunk.index + 1 }}
             </span>
-            <UButton
-              v-if="!chunk.success"
-              icon="i-heroicons-arrow-path"
-              size="xs"
-              color="error"
-              variant="ghost"
-              @click="emit('retry', chunk.index)"
+            <UDropdownMenu
+              :items="chunkMenuItems(chunk.index)"
+              @select="onChunkMenuSelect"
             >
-              Retry
-            </UButton>
+              <UButton
+                icon="i-heroicons-ellipsis-horizontal"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                aria-label="Paragraph actions"
+              />
+            </UDropdownMenu>
           </div>
         </template>
 
-        <p v-if="chunk.success" class="text-sm whitespace-pre-wrap">
-          {{ chunk.translated }}
-        </p>
+        <div v-if="chunk.success">
+          <p class="text-sm whitespace-pre-wrap">{{ chunk.translated }}</p>
+        </div>
         <div v-else>
           <p class="text-xs text-red-600 dark:text-red-400 mb-1">
             Translation failed — showing original text

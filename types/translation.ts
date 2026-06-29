@@ -13,6 +13,7 @@ export interface TranslateResponse {
 export type TranslationStatus =
   | 'idle'
   | 'translating'
+  | 'retrying'
   | 'done'
   | 'partial'
   | 'error'

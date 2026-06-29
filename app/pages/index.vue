@@ -8,6 +8,9 @@ const {
   detectedLanguage,
   translate,
   cancel,
+  retryChunk,
+  retryAll,
+  restartFromChunk,
   reset,
 } = useTranslation()
 
@@ -21,6 +24,9 @@ const canTranslate = computed(
 const buttonLabel = 'Translate'
 
 const translatingLabel = computed(() => {
+  if (status.value === 'retrying') {
+    return 'Retrying failed paragraph…'
+  }
   if (detectedLanguage.value) {
     return `Translating from ${detectedLanguage.value} to English…`
   }
@@ -48,6 +54,18 @@ async function handleTranslate() {
 
 function handleCancel() {
   cancel()
+}
+
+function handleRetry(index: number) {
+  retryChunk(index)
+}
+
+function handleRestart(index: number) {
+  restartFromChunk(index)
+}
+
+function handleRetryAll() {
+  retryAll()
 }
 
 function handleReset() {
@@ -125,6 +143,10 @@ function handleReset() {
           :chunks="chunks"
           status="partial"
           :target-language="displayLanguage"
+          :total="progress.total"
+          @retry="handleRetry"
+          @restart="handleRestart"
+          @retry-all="handleRetryAll"
         />
       </div>
 
@@ -133,12 +155,36 @@ function handleReset() {
       </p>
     </div>
 
+    <!-- State 2.5: Retrying a single chunk — show results with subtle indicator -->
+    <div v-else-if="status === 'retrying'" class="space-y-6">
+      <div class="flex items-center justify-center gap-2 text-sm text-primary-500">
+        <UIcon
+          name="i-heroicons-arrow-path"
+          class="animate-spin"
+        />
+        <span>{{ translatingLabel }}</span>
+      </div>
+      <TranslationResult
+        :chunks="chunks"
+        status="partial"
+        :target-language="displayLanguage"
+        :total="progress.total"
+        @retry="handleRetry"
+        @restart="handleRestart"
+        @retry-all="handleRetryAll"
+      />
+    </div>
+
     <!-- State 3: Results -->
     <div v-else-if="status === 'done' || status === 'partial'" class="space-y-6">
       <TranslationResult
         :chunks="chunks"
         :status="status"
         :target-language="displayLanguage"
+        :total="progress.total"
+        @retry="handleRetry"
+        @restart="handleRestart"
+        @retry-all="handleRetryAll"
       />
       <div class="text-center">
         <UButton
@@ -161,6 +207,10 @@ function handleReset() {
         :chunks="chunks"
         status="partial"
         :target-language="displayLanguage"
+        :total="progress.total"
+        @retry="handleRetry"
+        @restart="handleRestart"
+        @retry-all="handleRetryAll"
       />
       <div class="text-center">
         <UButton
