@@ -90,7 +90,7 @@ function clearFile() {
       </div>
       <UButton
         icon="i-heroicons-x-mark"
-        color="gray"
+        color="neutral"
         variant="ghost"
         size="xs"
         @click="clearFile"

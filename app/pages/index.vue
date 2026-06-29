@@ -81,7 +81,7 @@ function handleReset() {
       <div class="text-center">
         <UButton
           variant="ghost"
-          color="gray"
+          color="neutral"
           @click="handleReset"
         >
           Translate another file
@@ -92,7 +92,7 @@ function handleReset() {
     <!-- State: Error (no chunks at all) -->
     <UAlert
       v-else-if="status === 'error'"
-      color="red"
+      color="error"
       :title="error || 'Translation failed'"
       :actions="[{ label: 'Try again', onClick: handleReset }]"
     />

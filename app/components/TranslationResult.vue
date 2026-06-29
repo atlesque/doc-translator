@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { TranslatedChunk } from '../../types/translation'
+import type { TranslatedChunk } from '../../types/translation';
 
 const props = defineProps<{
-  chunks: TranslatedChunk[]
+  chunks: readonly TranslatedChunk[]
   status: 'done' | 'partial'
   targetLanguage: string
 }>()
@@ -45,7 +45,7 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
         <UButton
           icon="i-heroicons-clipboard"
           size="sm"
-          color="gray"
+          color="neutral"
           variant="outline"
           @click="copyAll"
         >
@@ -54,7 +54,7 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
         <UButton
           icon="i-heroicons-arrow-down-tray"
           size="sm"
-          color="gray"
+          color="neutral"
           variant="outline"
           @click="downloadTxt"
         >
@@ -69,7 +69,7 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
         v-for="chunk in chunks"
         :key="chunk.index"
         :ui="{
-          base: chunk.success ? '' : 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950',
+          root: chunk.success ? '' : 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950',
         }"
       >
         <template #header>
@@ -81,7 +81,7 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
               v-if="!chunk.success"
               icon="i-heroicons-arrow-path"
               size="xs"
-              color="red"
+              color="error"
               variant="ghost"
               @click="emit('retry', chunk.index)"
             >
@@ -109,7 +109,7 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
       <UButton
         icon="i-heroicons-clipboard"
         size="sm"
-        color="gray"
+        color="neutral"
         variant="outline"
         @click="copyAll"
       >
@@ -118,7 +118,7 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
       <UButton
         icon="i-heroicons-arrow-down-tray"
         size="sm"
-        color="gray"
+        color="neutral"
         variant="outline"
         @click="downloadTxt"
       >
