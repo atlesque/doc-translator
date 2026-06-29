@@ -77,7 +77,10 @@ function handleClearCache() {
 
 function handleReset() {
   file.value = null
-  language.value = ''
+  // Keep the last language selection — don't reset it
+  if (!language.value) {
+    language.value = 'Auto-detect'
+  }
   reset()
 }
 </script>
