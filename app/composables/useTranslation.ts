@@ -1,4 +1,4 @@
-import { readonly, ref, computed } from 'vue'
+import { computed, readonly, ref } from 'vue'
 import type { TranslatedChunk, TranslationStatus } from '../../types/translation'
 import { useTranslationCache } from './useTranslationCache'
 
