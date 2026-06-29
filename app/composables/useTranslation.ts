@@ -16,6 +16,7 @@ export function useTranslation() {
   const error = ref<string | null>(null)
   const targetLanguage = ref('')
   const detectedLanguage = ref<string | null>(null)
+  const retryingIndex = ref<number | null>(null)
   const apiKeyConfigured = ref(true)
   const configChecked = ref(false)
 
@@ -51,12 +52,10 @@ export function useTranslation() {
    */
   async function retryChunk(index: number) {
     const chunk = chunks.value[index]
-    if (!chunk || chunk.success) return
+    if (!chunk) return
 
-    // Mark as retrying
-    chunks.value = chunks.value.map((c, i) =>
-      i === index ? { ...c, error: undefined } : c,
-    )
+    // Mark this specific chunk as retrying
+    retryingIndex.value = index
     status.value = 'retrying'
 
     try {
@@ -73,24 +72,25 @@ export function useTranslation() {
       )
 
       if (result.success && result.translated) {
-        chunks.value = chunks.value.map((c, i) =>
-          i === index
-            ? { ...c, translated: result.translated!, success: true }
-            : c,
-        )
+        chunks.value[index] = {
+          ...chunk,
+          translated: result.translated,
+          success: true,
+          error: undefined,
+        }
       } else {
-        chunks.value = chunks.value.map((c, i) =>
-          i === index
-            ? { ...c, error: result.error || 'Retry failed' }
-            : c,
-        )
+        chunks.value[index] = {
+          ...chunk,
+          error: result.error || 'Retry failed',
+        }
       }
     } catch (err: any) {
-      chunks.value = chunks.value.map((c, i) =>
-        i === index
-          ? { ...c, error: err?.message || 'Retry failed' }
-          : c,
-      )
+      chunks.value[index] = {
+        ...chunk,
+        error: err?.message || 'Retry failed',
+      }
+    } finally {
+      retryingIndex.value = null
     }
 
     // Re-evaluate overall status
@@ -346,6 +346,7 @@ export function useTranslation() {
     originalFile = null
     effectiveTargetLanguage = ''
     effectiveSourceLanguage = undefined
+    retryingIndex.value = null
     status.value = 'idle'
     chunks.value = []
     progress.value = { current: 0, total: 0 }
@@ -357,6 +358,7 @@ export function useTranslation() {
   return {
     status: readonly(status),
     chunks: readonly(chunks),
+    retryingIndex: readonly(retryingIndex),
     progress: readonly(progress),
     error: readonly(error),
     targetLanguage: readonly(targetLanguage),

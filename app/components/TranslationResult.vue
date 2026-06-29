@@ -7,6 +7,7 @@ const props = defineProps<{
   status: 'done' | 'partial'
   targetLanguage: string
   total?: number
+  retryingIndex?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -14,6 +15,8 @@ const emit = defineEmits<{
   (e: 'restart', index: number): void
   (e: 'retryAll'): void
 }>()
+
+const isRetrying = (index: number) => props.retryingIndex === index
 
 const failedIndices = computed(() =>
   props.chunks
@@ -27,27 +30,19 @@ function chunkMenuItems(index: number): DropdownMenuItem[][] {
       {
         label: 'Retry this paragraph',
         icon: 'i-heroicons-arrow-path',
-        // @ts-ignore — custom payload for @select handler
-        _action: 'retry' as const,
-        _index: index,
+        onSelect() {
+          emit('retry', index)
+        },
       },
       {
         label: 'Restart from here',
         icon: 'i-heroicons-play',
-        // @ts-ignore
-        _action: 'restart' as const,
-        _index: index,
+        onSelect() {
+          emit('restart', index)
+        },
       },
     ],
   ]
-}
-
-function onChunkMenuSelect(item: DropdownMenuItem & { _action?: string; _index?: number }) {
-  if (item._action === 'retry' && item._index !== undefined) {
-    emit('retry', item._index)
-  } else if (item._action === 'restart' && item._index !== undefined) {
-    emit('restart', item._index)
-  }
 }
 
 function copyAll() {
@@ -118,7 +113,11 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
         v-for="chunk in chunks"
         :key="chunk.index"
         :ui="{
-          root: chunk.success ? '' : 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950',
+          root: isRetrying(chunk.index)
+            ? 'border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-950'
+            : chunk.success
+              ? ''
+              : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950',
         }"
       >
         <template #header>
@@ -128,7 +127,6 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
             </span>
             <UDropdownMenu
               :items="chunkMenuItems(chunk.index)"
-              @select="onChunkMenuSelect"
             >
               <UButton
                 icon="i-heroicons-ellipsis-horizontal"
@@ -141,16 +139,25 @@ const successCount = computed(() => props.chunks.filter(c => c.success).length)
           </div>
         </template>
 
-        <div v-if="chunk.success">
+        <div v-if="isRetrying(chunk.index)">
+          <!-- Skeleton loader while retrying -->
+          <div class="space-y-2 animate-pulse">
+            <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+            <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-5/6" />
+            <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-4/6" />
+          </div>
+        </div>
+        <div v-else-if="chunk.success">
           <p class="text-sm whitespace-pre-wrap">{{ chunk.translated }}</p>
         </div>
         <div v-else>
-          <p class="text-xs text-red-600 dark:text-red-400 mb-1">
-            Translation failed — showing original text
+          <p class="text-xs text-amber-600 dark:text-amber-400 mb-2">
+            ⚠️ This paragraph failed to translate. Use the context menu to retry.
           </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400 whitespace-pre-wrap">
-            {{ chunk.original }}
-          </p>
+          <details class="text-xs text-gray-500 dark:text-gray-400">
+            <summary class="cursor-pointer">Show original text</summary>
+            <p class="mt-1 whitespace-pre-wrap">{{ chunk.original }}</p>
+          </details>
         </div>
       </UCard>
     </div>

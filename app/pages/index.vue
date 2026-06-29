@@ -2,6 +2,7 @@
 const {
   status,
   chunks,
+  retryingIndex,
   progress,
   error,
   targetLanguage,
@@ -144,6 +145,7 @@ function handleReset() {
           status="partial"
           :target-language="displayLanguage"
           :total="progress.total"
+          :retrying-index="retryingIndex"
           @retry="handleRetry"
           @restart="handleRestart"
           @retry-all="handleRetryAll"
@@ -169,6 +171,7 @@ function handleReset() {
         status="partial"
         :target-language="displayLanguage"
         :total="progress.total"
+        :retrying-index="retryingIndex"
         @retry="handleRetry"
         @restart="handleRestart"
         @retry-all="handleRetryAll"
@@ -182,6 +185,7 @@ function handleReset() {
         :status="status"
         :target-language="displayLanguage"
         :total="progress.total"
+        :retrying-index="retryingIndex"
         @retry="handleRetry"
         @restart="handleRestart"
         @retry-all="handleRetryAll"
@@ -208,6 +212,7 @@ function handleReset() {
         status="partial"
         :target-language="displayLanguage"
         :total="progress.total"
+        :retrying-index="retryingIndex"
         @retry="handleRetry"
         @restart="handleRestart"
         @retry-all="handleRetryAll"
