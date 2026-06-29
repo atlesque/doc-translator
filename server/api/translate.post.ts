@@ -1,4 +1,4 @@
-import type { TranslateResponse } from '~/types/translation'
+import type { TranslatedChunk } from '../../types/translation'
 
 export default defineEventHandler(async (event) => {
   const formData = await readMultipartFormData(event)
@@ -27,6 +27,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'No target language provided' })
   }
 
+  // Narrowed after the guard above, but re-bind for closure safety
+  const lang: string = targetLanguage
+
   // Chunk the text
   const chunkTexts = splitIntoChunks(fileContent)
 
@@ -34,32 +37,58 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'File contains no text to translate' })
   }
 
-  // Translate each chunk with one retry
-  const chunks: TranslateResponse['chunks'] = []
+  const total = chunkTexts.length
 
-  for (let i = 0; i < chunkTexts.length; i++) {
-    const original = chunkTexts[i]
+  // Set up SSE streaming response
+  setHeader(event, 'Content-Type', 'text/event-stream')
+  setHeader(event, 'Cache-Control', 'no-cache')
+  setHeader(event, 'Connection', 'keep-alive')
+  setHeader(event, 'X-Accel-Buffering', 'no')
 
-    try {
-      const translated = await translateChunk(original, targetLanguage)
-      chunks.push({ index: i, original, translated, success: true })
-    } catch (firstError) {
-      console.warn(`Chunk ${i} first attempt failed, retrying...`, firstError)
-      try {
-        const translated = await translateChunk(original, targetLanguage)
-        chunks.push({ index: i, original, translated, success: true })
-      } catch (secondError: any) {
-        console.error(`Chunk ${i} failed after retry:`, secondError)
-        chunks.push({
-          index: i,
-          original,
-          translated: null,
-          success: false,
-          error: secondError?.message || 'Translation failed',
-        })
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder()
+      let hasFailure = false
+
+      // Send initial total so frontend knows how many chunks to expect
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'total', total })}\n\n`))
+
+      for (let i = 0; i < total; i++) {
+        const original = chunkTexts[i]!
+        let chunk: TranslatedChunk
+
+        try {
+          const translated = await translateChunk(original, lang)
+          chunk = { index: i, original, translated, success: true }
+        } catch (firstError) {
+          console.warn(`Chunk ${i} first attempt failed, retrying...`, firstError)
+          try {
+            const translated = await translateChunk(original, lang)
+            chunk = { index: i, original, translated, success: true }
+          } catch (secondError: any) {
+            console.error(`Chunk ${i} failed after retry:`, secondError)
+            hasFailure = true
+            chunk = {
+              index: i,
+              original,
+              translated: null,
+              success: false,
+              error: secondError?.message || 'Translation failed',
+            }
+          }
+        }
+
+        // Stream this chunk immediately
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', chunk })}\n\n`))
       }
-    }
-  }
 
-  return { chunks } satisfies TranslateResponse
+      // Send completion event
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ type: 'done', hasFailure })}\n\n`),
+      )
+      controller.close()
+    },
+  })
+
+  return sendStream(event, stream)
 })
